@@ -791,7 +791,6 @@ ${answerList}
   // ここには来ないはず（modeは "start" | "free" | "diagnosis" のみ）
   return null;
 }
-
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
@@ -842,6 +841,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 12px",
     borderRadius: 16,
     border: "1px solid rgba(0,0,0,0.06)",
+    boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
     whiteSpace: "pre-wrap",
     lineHeight: 1.6,
     fontSize: 14,
@@ -965,3 +965,4 @@ const styles: Record<string, React.CSSProperties> = {
     fontWeight: 800,
   },
 };
+
