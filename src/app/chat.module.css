@@ -88,6 +88,7 @@
   max-width: 75%;
   padding: 10px 14px;
   border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
   white-space: pre-wrap;
   line-height: 1.6;
   font-size: 14px;

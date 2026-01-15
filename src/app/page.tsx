@@ -841,6 +841,7 @@ const styles: Record<string, React.CSSProperties> = {
     padding: "10px 12px",
     borderRadius: 16,
     border: "1px solid rgba(0,0,0,0.06)",
+    boxShadow: "0 6px 18px rgba(0, 0, 0, 0.06)",
     whiteSpace: "pre-wrap",
     lineHeight: 1.6,
     fontSize: 14,
