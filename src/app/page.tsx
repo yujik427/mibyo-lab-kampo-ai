@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import stylesModule from "./chat.module.css";
 
+// アバター画像の定数
+const AVATAR_SRC = "/avatars/Kampot-kun.png";
+const AVATAR_ALT = "Kampot-kun";
+
 // Web Speech API型定義
 interface SpeechRecognition extends EventTarget {
   lang: string;
@@ -403,7 +407,11 @@ export default function Home() {
   // 音声認識用のstate
   const [isRecording, setIsRecording] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const [interimText, setInterimText] = useState("");
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [interimText, setInterimText] = useState(""); // 将来の拡張用（現在は未使用）
+
+  // アバター画像のエラー状態
+  const [avatarError, setAvatarError] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const committedRef = useRef<string>("");
@@ -756,18 +764,22 @@ ${answerList}
         }),
       });
 
-      const data = await response.json().catch(() => ({} as any));
+      const data = await response.json().catch(() => ({} as Record<string, unknown>));
 
       if (!response.ok) {
-        throw new Error(data?.error || `HTTP error! status: ${response.status}`);
+        const error = data?.error as string | undefined;
+        throw new Error(error || `HTTP error! status: ${response.status}`);
       }
 
       const answer: string =
-        data?.answer ??
-        data?.data?.answer ??
+        (data?.answer as string | undefined) ??
+        ((data?.data as Record<string, unknown>)?.answer as string | undefined) ??
         "（回答が取得できませんでした）";
 
-      const newConv: string = data?.conversation_id ?? data?.data?.conversation_id ?? "";
+      const newConv: string =
+        (data?.conversation_id as string | undefined) ??
+        ((data?.data as Record<string, unknown>)?.conversation_id as string | undefined) ??
+        "";
 
       if (newConv) {
         setConversationId(newConv);
@@ -776,13 +788,14 @@ ${answerList}
 
       // AI発言を履歴に追加
       setMessages((prev) => [...prev, { id: makeId(), role: "assistant", content: answer, ts: Date.now() }]);
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "unknown error";
       setMessages((prev) => [
         ...prev,
         {
           id: makeId(),
           role: "error",
-          content: `通信で問題が起きました。もう一度送ってみてください。\n（${err?.message ?? "unknown error"}）`,
+          content: `通信で問題が起きました。もう一度送ってみてください。\n（${errorMessage}）`,
           ts: Date.now(),
         },
       ]);
@@ -826,18 +839,22 @@ ${answerList}
         }),
       });
 
-      const data = await response.json().catch(() => ({} as any));
+      const data = await response.json().catch(() => ({} as Record<string, unknown>));
 
       if (!response.ok) {
-        throw new Error(data?.error || `HTTP error! status: ${response.status}`);
+        const error = data?.error as string | undefined;
+        throw new Error(error || `HTTP error! status: ${response.status}`);
       }
 
       const answer: string =
-        data?.answer ??
-        data?.data?.answer ??
+        (data?.answer as string | undefined) ??
+        ((data?.data as Record<string, unknown>)?.answer as string | undefined) ??
         "（回答が取得できませんでした）";
 
-      const newConv: string = data?.conversation_id ?? data?.data?.conversation_id ?? "";
+      const newConv: string =
+        (data?.conversation_id as string | undefined) ??
+        ((data?.data as Record<string, unknown>)?.conversation_id as string | undefined) ??
+        "";
 
       if (newConv) {
         setConversationId(newConv);
@@ -846,13 +863,14 @@ ${answerList}
 
       // AI発言を履歴に追加
       setMessages((prev) => [...prev, { id: makeId(), role: "assistant", content: answer, ts: Date.now() }]);
-    } catch (err: any) {
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "unknown error";
       setMessages((prev) => [
         ...prev,
         {
           id: makeId(),
           role: "error",
-          content: `通信で問題が起きました。もう一度送ってみてください。\n（${err?.message ?? "unknown error"}）`,
+          content: `通信で問題が起きました。もう一度送ってみてください。\n（${errorMessage}）`,
           ts: Date.now(),
         },
       ]);
@@ -907,11 +925,23 @@ ${answerList}
       <div style={styles.page}>
         <div style={styles.container}>
           <header style={styles.header}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <div>
-                <div style={styles.title}>体質診断（20問）</div>
-                <div style={styles.sub}>
-                  {isCompleted ? "診断完了" : `${progress} / ${DIAGNOSIS_QUESTIONS.length}`}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+              <div className={stylesModule.headerLeft}>
+                {avatarError ? (
+                  <div className={stylesModule.avatarFallback}>🤖</div>
+                ) : (
+                  <img
+                    src={AVATAR_SRC}
+                    alt={AVATAR_ALT}
+                    className={stylesModule.avatar}
+                    onError={() => setAvatarError(true)}
+                  />
+                )}
+                <div>
+                  <div style={styles.title}>体質診断（20問）</div>
+                  <div style={styles.sub}>
+                    {isCompleted ? "診断完了" : `${progress} / ${DIAGNOSIS_QUESTIONS.length}`}
+                  </div>
                 </div>
               </div>
               <button
@@ -994,11 +1024,23 @@ ${answerList}
     <div style={styles.page}>
       <div style={styles.container}>
         <header style={styles.header}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={styles.title}>体質相談チャット</div>
-              <div style={styles.sub}>
-                {conversationId ? "会話を継続中" : "新しい会話"}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", width: "100%" }}>
+            <div className={stylesModule.headerLeft}>
+              {avatarError ? (
+                <div className={stylesModule.avatarFallback}>🤖</div>
+              ) : (
+                <img
+                  src={AVATAR_SRC}
+                  alt={AVATAR_ALT}
+                  className={stylesModule.avatar}
+                  onError={() => setAvatarError(true)}
+                />
+              )}
+              <div>
+                <div style={styles.title}>体質相談チャット</div>
+                <div style={styles.sub}>
+                  {conversationId ? "会話を継続中" : "新しい会話"}
+                </div>
               </div>
             </div>
             <button
