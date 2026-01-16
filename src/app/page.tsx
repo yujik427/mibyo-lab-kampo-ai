@@ -1,6 +1,59 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import stylesModule from "./chat.module.css";
+
+// Web Speech API型定義
+interface SpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  start(): void;
+  stop(): void;
+  abort(): void;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  resultIndex: number;
+  results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  error: string;
+  message: string;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognitionConstructor {
+  new (): SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: SpeechRecognitionConstructor;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
+  }
+}
 
 type Role = "user" | "assistant" | "error";
 type Mode = "start" | "free" | "diagnosis";
@@ -240,6 +293,102 @@ function makeId() {
   return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
+// フィラー除去関数
+function normalizeSpeech(text: string, mode: "final" | "interim"): string {
+  if (!text) return "";
+  
+  let cleaned = text.trim();
+  
+  // final モードでは強めにフィラーを除去
+  if (mode === "final") {
+    // フィラーパターン（えっと、えーと、あの、その、うーん、んー、えー、まあ、まぁ など）
+    const fillers = [
+      /^えっと\s*/g,
+      /^えーと\s*/g,
+      /^あの\s*/g,
+      /^その\s*/g,
+      /^うーん\s*/g,
+      /^んー\s*/g,
+      /^えー\s*/g,
+      /^まあ\s*/g,
+      /^まぁ\s*/g,
+      /\s*えっと\s*/g,
+      /\s*えーと\s*/g,
+      /\s*あの\s*/g,
+      /\s*その\s*/g,
+      /\s*うーん\s*/g,
+      /\s*んー\s*/g,
+      /\s*えー\s*/g,
+      /\s*まあ\s*/g,
+      /\s*まぁ\s*/g,
+    ];
+    
+    fillers.forEach((pattern) => {
+      cleaned = cleaned.replace(pattern, " ");
+    });
+  } else {
+    // interim モードでは弱め（文頭のみ）
+    const fillers = [
+      /^えっと\s*/g,
+      /^えーと\s*/g,
+      /^あの\s*/g,
+      /^その\s*/g,
+      /^うーん\s*/g,
+      /^んー\s*/g,
+      /^えー\s*/g,
+      /^まあ\s*/g,
+      /^まぁ\s*/g,
+    ];
+    
+    fillers.forEach((pattern) => {
+      cleaned = cleaned.replace(pattern, "");
+    });
+  }
+  
+  // 連続スペースを1つに
+  cleaned = cleaned.replace(/\s+/g, " ");
+  
+  // 句読点前後の空白を整理
+  cleaned = cleaned.replace(/\s+([、。，．])/g, "$1");
+  cleaned = cleaned.replace(/([、。，．])\s+/g, "$1 ");
+  
+  return cleaned.trim();
+}
+
+// 重複除去関数（最大オーバーラップ検出）
+function appendWithOverlap(base: string, addition: string): string {
+  if (!base) return addition;
+  if (!addition) return base;
+  
+  const baseTrimmed = base.trim();
+  const additionTrimmed = addition.trim();
+  
+  if (!baseTrimmed) return additionTrimmed;
+  if (!additionTrimmed) return baseTrimmed;
+  
+  // 重複検出：末尾と先頭の最大オーバーラップを探す
+  const minLen = Math.min(baseTrimmed.length, additionTrimmed.length);
+  let maxOverlap = 0;
+  
+  for (let len = minLen; len > 0; len--) {
+    const baseSuffix = baseTrimmed.slice(-len);
+    const additionPrefix = additionTrimmed.slice(0, len);
+    
+    if (baseSuffix === additionPrefix) {
+      maxOverlap = len;
+      break;
+    }
+  }
+  
+  // オーバーラップ部分を除いて追加
+  if (maxOverlap > 0) {
+    return baseTrimmed + additionTrimmed.slice(maxOverlap);
+  }
+  
+  // オーバーラップがない場合はスペースを挟んで結合
+  return baseTrimmed + " " + additionTrimmed;
+}
+
 export default function Home() {
   const [inputText, setInputText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -251,7 +400,14 @@ export default function Home() {
   const [diagnosisAnswers, setDiagnosisAnswers] = useState<Record<string, string>>({});
   const [diagnosisIndex, setDiagnosisIndex] = useState(0);
 
+  // 音声認識用のstate
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [interimText, setInterimText] = useState("");
+
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const committedRef = useRef<string>("");
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   // localStorage から各種データを読み込む（初回マウント時）
   useEffect(() => {
@@ -406,7 +562,107 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const canSend = useMemo(() => inputText.trim().length > 0 && !loading, [inputText, loading]);
+  // 音声認識の初期化（フリー相談モードのみ）
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (mode !== "free") return;
+
+    const SpeechRecognitionClass =
+      window.SpeechRecognition || window.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionClass) {
+      setVoiceError("お使いのブラウザは音声認識に対応していません");
+      return;
+    }
+
+    const recognition = new SpeechRecognitionClass();
+    recognition.lang = "ja-JP";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      let interim = "";
+      let final = "";
+
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          const normalized = normalizeSpeech(transcript, "final");
+          if (normalized) {
+            final += (final ? " " : "") + normalized;
+          }
+        } else {
+          const normalized = normalizeSpeech(transcript, "interim");
+          if (normalized) {
+            interim += (interim ? " " : "") + normalized;
+          }
+        }
+      }
+
+      // final（確定結果）をcommittedRefに追記（重複除去付き）
+      if (final) {
+        committedRef.current = appendWithOverlap(committedRef.current, final);
+      }
+
+      // interim（途中結果）をstateに保存
+      setInterimText(interim);
+
+      // textareaに表示する値 = committedRef.current + interim
+      const displayText = committedRef.current + (interim ? " " + interim : "");
+      setInputText(displayText.trim());
+    };
+
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error === "no-speech") {
+        // 無音はエラーとして扱わない
+        return;
+      }
+      setVoiceError(`音声認識エラー: ${event.error}`);
+      setIsRecording(false);
+      recognition.stop();
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+      setInterimText("");
+      // 録音終了時、確定テキストのみ残す
+      setInputText(committedRef.current);
+    };
+
+    recognitionRef.current = recognition;
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+      }
+    };
+  }, [mode]);
+
+  // 録音開始/停止のハンドラー
+  const handleToggleRecording = () => {
+    if (!recognitionRef.current) {
+      setVoiceError("音声認識が初期化されていません");
+      return;
+    }
+
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      setInterimText("");
+      // 録音終了時、確定テキストのみ残す
+      setInputText(committedRef.current);
+    } else {
+      setVoiceError(null);
+      committedRef.current = inputText.trim(); // 現在の入力内容を確定済みとして保持
+      setInterimText("");
+      recognitionRef.current.start();
+      setIsRecording(true);
+    }
+  };
+
+  const canSend = useMemo(() => inputText.trim().length > 0 && !loading && !isRecording, [inputText, loading, isRecording]);
 
   // モード選択
   const handleModeSelect = (selectedMode: "free" | "diagnosis") => {
@@ -538,9 +794,18 @@ ${answerList}
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const text = inputText.trim();
-    if (!text || loading) return;
+    if (!text || loading || isRecording) return;
     if (mode !== "free") return; // freeモードでのみ実行
 
+    // 録音中なら停止
+    if (isRecording && recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      setInterimText("");
+    }
+
+    // 送信前に確定済みテキストをクリア
+    committedRef.current = "";
     setInputText("");
     setLoading(true);
 
@@ -771,17 +1036,55 @@ ${answerList}
           <div ref={bottomRef} />
         </main>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <input
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="漢方薬剤師に相談する…"
-            style={styles.input}
+        <form onSubmit={handleSubmit} className={stylesModule.form}>
+          <div className={stylesModule.inputWrapper} style={{ position: "relative" }}>
+            <textarea
+              value={inputText}
+              onChange={(e) => {
+                const newText = e.target.value;
+                setInputText(newText);
+                // 手動入力時は確定済みテキストも更新
+                if (!isRecording) {
+                  committedRef.current = newText;
+                }
+              }}
+              onKeyDown={(e) => {
+                // Enter送信、Shift+Enter改行
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSend) {
+                    handleSubmit(e);
+                  }
+                }
+              }}
+              placeholder="漢方薬剤師に相談する…"
+              className={stylesModule.textarea}
+              disabled={loading || isRecording}
+              rows={1}
+            />
+            {isRecording && (
+              <div className={stylesModule.recordingIndicator} title="録音中">
+                <span className={stylesModule.recordingDot}></span>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleRecording}
+            className={stylesModule.micButton}
             disabled={loading}
-          />
-          <button type="submit" style={styles.btn} disabled={!canSend}>
+            title={isRecording ? "録音停止" : "録音開始"}
+          >
+            🎙
+          </button>
+          <button type="submit" className={stylesModule.sendBtn} disabled={!canSend}>
             {loading ? "送信中…" : "送信"}
           </button>
+          {voiceError && (
+            <div style={{ fontSize: 12, color: "#c00", marginTop: 4, width: "100%", order: 10 }}>
+              {voiceError}
+            </div>
+          )}
         </form>
       </div>
     </div>

@@ -161,18 +161,21 @@
   padding: 12px;
   border-top: 1px solid rgba(0, 0, 0, 0.06);
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: flex-end;
   background: #fff;
+  flex-wrap: wrap; /* エラーメッセージがある場合の折り返し対応 */
 }
 
 .inputWrapper {
   flex: 1;
   position: relative;
+  min-width: 0; /* flexアイテムの縮小を許可 */
 }
 
 .textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: 10px 48px 10px 12px; /* 右側にスペースを追加（録音インジケータ用） */
   border-radius: 20px;
   border: 1px solid rgba(0, 0, 0, 0.14);
   outline: none;
@@ -182,6 +185,7 @@
   min-height: 40px;
   max-height: 120px;
   line-height: 1.5;
+  box-sizing: border-box; /* paddingを含めた幅計算 */
 }
 
 .textarea:focus {
@@ -203,7 +207,8 @@
   font-size: 14px;
   font-weight: 600;
   transition: all 0.2s;
-  align-self: flex-end;
+  flex-shrink: 0; /* 縮小しない */
+  height: 40px;
 }
 
 .sendBtn:hover:not(:disabled) {
@@ -213,6 +218,65 @@
 .sendBtn:disabled {
   background: #ccc;
   cursor: not-allowed;
+}
+
+/* マイクボタン */
+.micButton {
+  padding: 0;
+  border-radius: 20px;
+  border: 1px solid rgba(0, 0, 0, 0.14);
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  font-size: 18px;
+  transition: all 0.2s;
+  flex-shrink: 0; /* 縮小しない */
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.micButton:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #6b7b58;
+}
+
+.micButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 録音インジケータ */
+.recordingIndicator {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.recordingDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #f44336;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.2);
+  }
 }
 
 /* 診断モード用（既存スタイルを維持） */
