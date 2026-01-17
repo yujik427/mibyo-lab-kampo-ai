@@ -510,7 +510,22 @@ export default function Home() {
           },
         ]);
       } else {
-        setMessages([]);
+        // diagnosisモードでメッセージがない場合は最初の質問を表示
+        const storedIndex = parseInt(localStorage.getItem(LS_DIAG_INDEX) || "0", 10);
+        const currentIdx = !isNaN(storedIndex) && storedIndex >= 0 ? storedIndex : 0;
+        if (currentIdx < DIAGNOSIS_QUESTIONS.length) {
+          const firstQuestion = DIAGNOSIS_QUESTIONS[currentIdx];
+          setMessages([
+            {
+              id: makeId(),
+              role: "assistant" as Role,
+              content: firstQuestion.question,
+              ts: Date.now(),
+            },
+          ]);
+        } else {
+          setMessages([]);
+        }
       }
     } catch (err) {
       console.error("Failed to parse messages from localStorage:", err);
@@ -518,13 +533,28 @@ export default function Home() {
         setMessages([
           {
             id: makeId(),
-            role: "assistant",
+            role: "assistant" as Role,
             content: "こんにちは。体調で気になることを教えてください。",
             ts: Date.now(),
           },
         ]);
       } else {
-        setMessages([]);
+        // diagnosisモードでメッセージがない場合は最初の質問を表示
+        const storedIndex = parseInt(localStorage.getItem(LS_DIAG_INDEX) || "0", 10);
+        const currentIdx = !isNaN(storedIndex) && storedIndex >= 0 ? storedIndex : 0;
+        if (currentIdx < DIAGNOSIS_QUESTIONS.length) {
+          const firstQuestion = DIAGNOSIS_QUESTIONS[currentIdx];
+          setMessages([
+            {
+              id: makeId(),
+              role: "assistant" as Role,
+              content: firstQuestion.question,
+              ts: Date.now(),
+            },
+          ]);
+        } else {
+          setMessages([]);
+        }
       }
     }
   }, [mode]);
@@ -705,16 +735,32 @@ export default function Home() {
     const newAnswers = { ...diagnosisAnswers, [questionId]: answerLabel };
     setDiagnosisAnswers(newAnswers);
 
-    // ユーザーメッセージとして追加
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: makeId(),
-        role: "user",
-        content: answerLabel,
-        ts: Date.now(),
-      },
-    ]);
+    // ユーザーの回答のみをメッセージとして追加（質問は既にメッセージ履歴に存在するため追加しない）
+    setMessages((prev) => {
+      const newMessages: ChatMessage[] = [
+        ...prev,
+        {
+          id: makeId(),
+          role: "user" as Role,
+          content: answerLabel,
+          ts: Date.now(),
+        },
+      ];
+
+      // 次の質問がある場合は、次の質問をアシスタントメッセージとして追加
+      const nextIndex = diagnosisIndex + 1;
+      if (nextIndex < DIAGNOSIS_QUESTIONS.length) {
+        const nextQuestion = DIAGNOSIS_QUESTIONS[nextIndex];
+        newMessages.push({
+          id: makeId(),
+          role: "assistant" as Role,
+          content: nextQuestion.question,
+          ts: Date.now(),
+        });
+      }
+
+      return newMessages;
+    });
 
     // 次の質問へ
     if (diagnosisIndex < DIAGNOSIS_QUESTIONS.length - 1) {
@@ -979,7 +1025,7 @@ ${answerList}
 
             {!isCompleted && currentQuestion && (
               <div style={styles.diagnosisQuestion}>
-                <div style={styles.diagnosisQuestionText}>{currentQuestion.question}</div>
+                {/* 質問はメッセージとして表示されているので、選択肢のみ表示 */}
                 <div style={styles.diagnosisOptions}>
                   {currentQuestion.options.map((option) => (
                     <button
