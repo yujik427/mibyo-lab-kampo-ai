@@ -492,7 +492,7 @@ export default function Home() {
             {
               id: makeId(),
               role: "assistant",
-              content: "こんにちは。体調で気になることを教えてください。",
+              content: "こんにちは。ご利用いただきありがとうございます😊🌿\nまず最初に、年齢と性別を教えてください。\n例：35歳・男性 / 30代・女性\n\n（このあと全20問で、体調や体質の傾向を漢方的な視点で整理していきます。正解・不正解はありません。※本チャットは医療行為・診断を目的としたものではありません。体調に強い不安がある場合は医療機関にご相談ください。）",
               ts: Date.now(),
             },
           ]);
@@ -505,7 +505,7 @@ export default function Home() {
           {
             id: makeId(),
             role: "assistant",
-            content: "こんにちは。体調で気になることを教えてください。",
+            content: "こんにちは。ご利用いただきありがとうございます😊🌿\nまず最初に、年齢と性別を教えてください。\n例：35歳・男性 / 30代・女性\n\n（このあと全20問で、体調や体質の傾向を漢方的な視点で整理していきます。正解・不正解はありません。※本チャットは医療行為・診断を目的としたものではありません。体調に強い不安がある場合は医療機関にご相談ください。）",
             ts: Date.now(),
           },
         ]);
@@ -534,7 +534,7 @@ export default function Home() {
           {
             id: makeId(),
             role: "assistant" as Role,
-            content: "こんにちは。体調で気になることを教えてください。",
+            content: "こんにちは。ご利用いただきありがとうございます😊🌿\nまず最初に、年齢と性別を教えてください。\n例：35歳・男性 / 30代・女性\n\n（このあと全20問で、体調や体質の傾向を漢方的な視点で整理していきます。正解・不正解はありません。※本チャットは医療行為・診断を目的としたものではありません。体調に強い不安がある場合は医療機関にご相談ください。）",
             ts: Date.now(),
           },
         ]);
@@ -869,7 +869,12 @@ ${answerList}
     setLoading(true);
 
     // ユーザー発言を履歴に追加
-    setMessages((prev) => [...prev, { id: makeId(), role: "user", content: text, ts: Date.now() }]);
+    const typingMessageId = makeId();
+    setMessages((prev) => [
+      ...prev,
+      { id: makeId(), role: "user", content: text, ts: Date.now() },
+      { id: typingMessageId, role: "assistant", content: "整えてます", ts: Date.now() },
+    ]);
 
     const currentUser = userId || "user";
     const currentConv = conversationId || "";
@@ -907,19 +912,26 @@ ${answerList}
         localStorage.setItem(LS_CONV_ID_FREE, newConv);
       }
 
-      // AI発言を履歴に追加
-      setMessages((prev) => [...prev, { id: makeId(), role: "assistant", content: answer, ts: Date.now() }]);
+      // タイピングメッセージを削除して、AI発言を履歴に追加
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.id !== typingMessageId);
+        return [...filtered, { id: makeId(), role: "assistant", content: answer, ts: Date.now() }];
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "unknown error";
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: makeId(),
-          role: "error",
-          content: `通信で問題が起きました。もう一度送ってみてください。\n（${errorMessage}）`,
-          ts: Date.now(),
-        },
-      ]);
+      // タイピングメッセージを削除して、エラーメッセージを追加
+      setMessages((prev) => {
+        const filtered = prev.filter((m) => m.id !== typingMessageId);
+        return [
+          ...filtered,
+          {
+            id: makeId(),
+            role: "error",
+            content: `通信で問題が起きました。もう一度送ってみてください。\n（${errorMessage}）`,
+            ts: Date.now(),
+          },
+        ];
+      });
     } finally {
       setLoading(false);
     }
@@ -1101,26 +1113,41 @@ ${answerList}
         </header>
 
         <main style={styles.chat}>
-          {messages.map((m) => (
-            <div
-              key={m.id}
-              style={{
-                display: "flex",
-                justifyContent: m.role === "user" ? "flex-end" : "flex-start",
-              }}
-            >
+          {messages.map((m) => {
+            // 「整えてます」メッセージの場合はタイピングアニメーションを表示
+            const isTyping = m.content === "整えてます" && loading;
+            return (
               <div
+                key={m.id}
                 style={{
-                  ...styles.bubble,
-                  ...(m.role === "user" ? styles.user : {}),
-                  ...(m.role === "assistant" ? styles.assistant : {}),
-                  ...(m.role === "error" ? styles.error : {}),
+                  display: "flex",
+                  justifyContent: m.role === "user" ? "flex-end" : "flex-start",
                 }}
               >
-                {m.content}
+                {isTyping ? (
+                  <div className={stylesModule.typingMessage}>
+                    整えてます
+                    <span className={stylesModule.typingDots}>
+                      <span className={stylesModule.typingDotChar}>.</span>
+                      <span className={stylesModule.typingDotChar}>.</span>
+                      <span className={stylesModule.typingDotChar}>.</span>
+                    </span>
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      ...styles.bubble,
+                      ...(m.role === "user" ? styles.user : {}),
+                      ...(m.role === "assistant" ? styles.assistant : {}),
+                      ...(m.role === "error" ? styles.error : {}),
+                    }}
+                  >
+                    {m.content}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           <div ref={bottomRef} />
         </main>
 
