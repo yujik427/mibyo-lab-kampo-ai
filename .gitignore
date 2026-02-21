@@ -40,6 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# subproject (reference only)
+/health-consultation-ui
+
 
 
 

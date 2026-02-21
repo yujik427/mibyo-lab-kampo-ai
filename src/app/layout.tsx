@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import "./globals.css";
+import { AppShell } from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
   title: "体質診断 | 漢方セルフケアAIアプリ",
@@ -13,7 +15,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ja">
-      <body>{children}</body>
+      <body className="font-sans antialiased">
+        <AppShell>{children}</AppShell>
+      </body>
     </html>
   );
 }
