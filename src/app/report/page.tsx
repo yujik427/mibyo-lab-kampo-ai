@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ChevronRight, FileText, Trash2 } from "lucide-react";
@@ -9,21 +9,23 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getReports, deleteReport } from "@/lib/storage";
 import type { DiagnosisReport } from "@/lib/types";
+import { useIsClient } from "@/hooks/use-is-client";
 
 export default function ReportListPage() {
   const router = useRouter();
-  const [reports, setReports] = useState<DiagnosisReport[]>([]);
-
-  useEffect(() => {
-    setReports(getReports());
-  }, []);
+  const isClient = useIsClient();
+  const [refreshKey, setRefreshKey] = useState(0);
+  const reports = useMemo<DiagnosisReport[]>(() => {
+    void refreshKey;
+    return isClient ? getReports() : [];
+  }, [isClient, refreshKey]);
 
   const handleDelete = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (!confirm("このレポートを削除しますか？")) return;
     deleteReport(id);
-    setReports(getReports());
+    setRefreshKey((current) => current + 1);
   };
 
   return (

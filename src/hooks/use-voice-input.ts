@@ -109,16 +109,18 @@ export function useVoiceInput({ enabled, onTextChange, initialText }: UseVoiceIn
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const committedRef = useRef<string>(initialText ?? "");
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const unsupportedRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !enabled) return;
 
     const SpeechRecognitionClass = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionClass) {
-      setVoiceError("お使いのブラウザは音声認識に対応していません");
+      unsupportedRef.current = true;
       return;
     }
 
+    unsupportedRef.current = false;
     const recognition = new SpeechRecognitionClass();
     recognition.lang = "ja-JP";
     recognition.continuous = true;
@@ -167,7 +169,11 @@ export function useVoiceInput({ enabled, onTextChange, initialText }: UseVoiceIn
 
   const toggleRecording = useCallback((currentText: string) => {
     if (!recognitionRef.current) {
-      setVoiceError("音声認識が初期化されていません");
+      setVoiceError(
+        unsupportedRef.current
+          ? "お使いのブラウザは音声認識に対応していません"
+          : "音声認識が初期化されていません",
+      );
       return;
     }
     if (isRecording) {

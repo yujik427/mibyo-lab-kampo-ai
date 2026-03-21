@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { DIAGNOSIS_ANSWER_PERIOD_LABEL } from "@/lib/constants";
 import type { DiagnosisQuestion } from "@/lib/types";
 
 interface DiagnosisOptionsProps {
@@ -21,6 +22,9 @@ export function DiagnosisOptions({ question, progress, onSelect }: DiagnosisOpti
           <span>{Math.round(pct)}%</span>
         </div>
         <Progress value={pct} className="h-1.5" />
+        <p className="text-[11px] text-muted-foreground">
+          {DIAGNOSIS_ANSWER_PERIOD_LABEL}の状態を思い出して選んでください
+        </p>
       </div>
       <div className="flex flex-col gap-2">
         {question.options.map((opt, idx) => (

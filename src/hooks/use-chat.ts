@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, DiagnosisReport } from "@/lib/types";
 import { FREE_WELCOME_MESSAGE } from "@/lib/constants";
 import {
   makeId,
@@ -10,12 +10,37 @@ import {
   setConversationId as storeConversationId,
   getMessages as storedMessages,
   setMessages as storeMessages,
+  saveReport,
 } from "@/lib/storage";
+import { parseDiagnosisResponse } from "@/lib/report-parser";
+
+function isFinalAnalysisResult(answer: string) {
+  const parsed = parseDiagnosisResponse(answer);
+  const meaningfulSections = parsed.sections.filter((s) => s.title !== "診断結果").length;
+  const hasStructuredHeadings =
+    /##\s*体質タイプ|##\s*1\)\s*体質の整理|生活改善提案|受診の目安/.test(answer);
+
+  const signals = [
+    Boolean(parsed.constitutionType),
+    meaningfulSections >= 2,
+    parsed.recommendations.length >= 2,
+    parsed.kampoSuggestions.length >= 1,
+    Boolean(parsed.consultationGuidance),
+    hasStructuredHeadings,
+  ];
+
+  return {
+    isFinal: signals.filter(Boolean).length >= 2,
+    parsed,
+  };
+}
 
 export function useChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState("");
+  const [pendingReport, setPendingReport] = useState<DiagnosisReport | null>(null);
+  const [latestReport, setLatestReport] = useState<DiagnosisReport | null>(null);
   const userIdRef = useRef("");
 
   useEffect(() => {
@@ -74,6 +99,22 @@ export function useChat() {
         storeConversationId("free", newConv);
       }
 
+      const finalCheck = isFinalAnalysisResult(answer);
+      if (finalCheck.isFinal) {
+        const report: DiagnosisReport = {
+          id: makeId(),
+          createdAt: new Date().toISOString(),
+          mode: "free",
+          rawResponse: answer,
+          parsed: finalCheck.parsed,
+          conversationId: newConv || conversationId,
+        };
+        saveReport(report);
+        setPendingReport(report);
+        setMessages((prev) => prev.filter((m) => m.id !== typingId));
+        return;
+      }
+
       setMessages((prev) => {
         const filtered = prev.filter((m) => m.id !== typingId);
         return [...filtered, { id: makeId(), role: "assistant", content: answer, ts: Date.now() }];
@@ -97,9 +138,25 @@ export function useChat() {
       { id: makeId(), role: "assistant", content: FREE_WELCOME_MESSAGE, ts: Date.now() },
     ]);
     setConversationId("");
+    setPendingReport(null);
+    setLatestReport(null);
     storeConversationId("free", "");
     storeMessages("free", []);
   }, []);
 
-  return { messages, loading, conversationId, sendMessage, reset };
+  const openResult = useCallback(() => {
+    if (!pendingReport) return;
+    setLatestReport(pendingReport);
+  }, [pendingReport]);
+
+  return {
+    messages,
+    loading,
+    conversationId,
+    pendingReport,
+    latestReport,
+    sendMessage,
+    openResult,
+    reset,
+  };
 }

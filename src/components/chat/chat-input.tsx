@@ -13,6 +13,7 @@ interface ChatInputProps {
   onToggleRecording?: (text: string) => void;
   onTextChange?: (text: string) => void;
   disabled?: boolean;
+  value?: string;
 }
 
 export function ChatInput({
@@ -23,9 +24,19 @@ export function ChatInput({
   onToggleRecording,
   onTextChange,
   disabled,
+  value,
 }: ChatInputProps) {
-  const [text, setText] = useState("");
+  const [internalText, setInternalText] = useState("");
+  const text = value !== undefined ? value : internalText;
+  const setText = useCallback(
+    (v: string) => {
+      setInternalText(v);
+      onTextChange?.(v);
+    },
+    [onTextChange],
+  );
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const composingRef = useRef(false);
 
   const canSend = useMemo(
     () => text.trim().length > 0 && !loading && !isRecording && !disabled,
@@ -46,11 +57,13 @@ export function ChatInput({
       onSend(text.trim());
       setText("");
     },
-    [canSend, text, onSend],
+    [canSend, text, onSend, setText],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (composingRef.current) return;
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
         if (canSend) {
@@ -59,7 +72,7 @@ export function ChatInput({
         }
       }
     },
-    [canSend, text, onSend],
+    [canSend, text, onSend, setText],
   );
 
   return (
@@ -73,9 +86,10 @@ export function ChatInput({
           value={text}
           onChange={(e) => {
             setText(e.target.value);
-            onTextChange?.(e.target.value);
           }}
           onKeyDown={handleKeyDown}
+          onCompositionStart={() => { composingRef.current = true; }}
+          onCompositionEnd={() => { composingRef.current = false; }}
           placeholder="漢方薬剤師に相談する…"
           className={cn(
             "w-full resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm leading-relaxed",

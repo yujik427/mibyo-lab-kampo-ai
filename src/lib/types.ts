@@ -32,8 +32,9 @@ export interface DiagnosisReport {
       title: string;
       content: string;
     }[];
-    recommendations: string[];
+    recommendations: { title: string; content: string }[];
     kampoSuggestions: string[];
+    consultationGuidance?: string;
   };
   conversationId: string;
 }

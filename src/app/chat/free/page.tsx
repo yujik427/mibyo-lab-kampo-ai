@@ -1,31 +1,41 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChatHeader } from "@/components/chat/chat-header";
 import { ChatBubble } from "@/components/chat/chat-bubble";
 import { ChatInput } from "@/components/chat/chat-input";
+import { DiagnosisComplete } from "@/components/chat/diagnosis-complete";
 import { useChat } from "@/hooks/use-chat";
 import { useVoiceInput } from "@/hooks/use-voice-input";
 
 export default function FreeChatPage() {
   const router = useRouter();
-  const { messages, loading, sendMessage, reset } = useChat();
+  const { messages, loading, pendingReport, latestReport, sendMessage, openResult, reset } = useChat();
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [inputText, setInputText] = useState("");
 
-  const handleTextChange = useCallback(() => {}, []);
+  const handleVoiceTextChange = useCallback((text: string) => {
+    setInputText(text);
+  }, []);
 
   const voice = useVoiceInput({
     enabled: true,
-    onTextChange: handleTextChange,
+    onTextChange: handleVoiceTextChange,
   });
 
   useEffect(() => {
     requestAnimationFrame(() => {
       bottomRef.current?.scrollIntoView({ behavior: "smooth" });
     });
-  }, [messages.length]);
+  }, [messages.length, pendingReport]);
+
+  useEffect(() => {
+    if (latestReport) {
+      router.push(`/report/${latestReport.id}`);
+    }
+  }, [latestReport, router]);
 
   const handleSend = useCallback(
     (text: string) => {
@@ -33,6 +43,7 @@ export default function FreeChatPage() {
         voice.toggleRecording(text);
       }
       voice.resetCommitted();
+      setInputText("");
       sendMessage(text);
     },
     [sendMessage, voice],
@@ -56,20 +67,33 @@ export default function FreeChatPage() {
               isTyping={m.content === "整えてます" && loading}
             />
           ))}
+          {pendingReport && (
+            <DiagnosisComplete
+              onGenerateResult={openResult}
+              title="全20問への回答が完了しました"
+              description="AIによる体質分析が完了しました。結果ページで詳しく確認できます"
+              buttonLabel="分析結果を見る"
+              loadingLabel="結果を開いています…"
+            />
+          )}
           <div ref={bottomRef} className="h-1" />
         </div>
       </div>
 
-      <ChatInput
-        onSend={handleSend}
-        loading={loading}
-        isRecording={voice.isRecording}
-        voiceError={voice.voiceError}
-        onToggleRecording={voice.toggleRecording}
-        onTextChange={(t) => {
-          if (!voice.isRecording) voice.updateCommitted(t);
-        }}
-      />
+      {!pendingReport && (
+        <ChatInput
+          onSend={handleSend}
+          loading={loading}
+          isRecording={voice.isRecording}
+          voiceError={voice.voiceError}
+          onToggleRecording={voice.toggleRecording}
+          value={inputText}
+          onTextChange={(t) => {
+            setInputText(t);
+            if (!voice.isRecording) voice.updateCommitted(t);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -65,8 +65,8 @@ export function useDiagnosis() {
   }, [currentIndex]);
 
   const answerQuestion = useCallback(
-    (questionId: string, _answerValue: string, answerLabel: string) => {
-      const newAnswers = { ...answers, [questionId]: answerLabel };
+    (questionId: string, answerValue: string, answerLabel: string) => {
+      const newAnswers = { ...answers, [questionId]: answerValue };
       setAnswers(newAnswers);
 
       setMessages((prev) => {
@@ -100,21 +100,39 @@ export function useDiagnosis() {
     setLoading(true);
 
     const answerList = Object.entries(answers)
-      .map(([qId, answer]) => {
+      .map(([qId, answerValue]) => {
         const q = DIAGNOSIS_QUESTIONS.find((q) => q.id === qId);
-        return `- ${q?.question ?? qId}: ${answer}`;
+        const answerLabel =
+          q?.options.find((option) => option.value === answerValue)?.label ?? answerValue;
+        return `- ${q?.question ?? qId}: ${answerLabel}`;
       })
       .join("\n");
 
     const query = `---
-あなたは漢方の薬剤師AIです。以下は20問の体質診断回答です。
+あなたは漢方の薬剤師AIです。以下は直近2週間の20問体質診断回答です。
 回答一覧（questionId: answerLabel）：
 ${answerList}
-この回答にもとづき、次のフォーマットで出力してください：
-1) 体質の整理（エネルギー不足/血の巡り/水分バランス、冷え/のぼせ等）
-2) 体質に合う漢方の方向性＋代表処方名を1〜3候補（断定しない）
-3) 生活改善提案（すぐできることを3つ）
-注意：医療行為の断定はしない。受診の目安も必要なら一言添える。
+
+【必ず次のフォーマットで出力してください】
+
+## 体質タイプ
+（例：気虚傾向、気滞＋血虚 など、1行で）
+
+## 1) 体質の整理
+（エネルギー不足/血の巡り/水分バランス、冷え/のぼせ等を2〜4文で整理）
+
+## 2) 体質に合う漢方の方向性
+（方向性＋代表処方名を1〜3候補。断定しない）
+
+## 3) 生活改善提案（すぐできること3つ）
+① 見出し（5文字以内）：具体的な説明
+② 見出し（5文字以内）：具体的な説明
+③ 見出し（5文字以内）：具体的な説明
+
+## 4) 受診の目安
+（受診が必要な場合のみ1〜2文で簡潔に。不要なら「現時点ではセルフケアを優先で問題ありません」と記載）
+
+※医療行為の断定はしない。
 ---`;
 
     try {
@@ -144,10 +162,7 @@ ${answerList}
         storeConversationId("diagnosis", newConv);
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { id: makeId(), role: "assistant", content: answer, ts: Date.now() },
-      ]);
+
 
       const report: DiagnosisReport = {
         id: makeId(),

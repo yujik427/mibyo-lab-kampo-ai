@@ -5,10 +5,11 @@ import { ClipboardCheck, MessageCircle, FileText, ChevronRight, Leaf } from "luc
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { getReports } from "@/lib/storage";
 import type { DiagnosisReport } from "@/lib/types";
 import { AVATAR_SRC, AVATAR_ALT } from "@/lib/constants";
+import { useIsClient } from "@/hooks/use-is-client";
 
 function FeatureCard({
   title,
@@ -83,13 +84,12 @@ function RecentReportCard({ report }: { report: DiagnosisReport }) {
 }
 
 export default function DashboardPage() {
-  const [reports, setReports] = useState<DiagnosisReport[]>([]);
-
-  useEffect(() => {
-    setReports(getReports().slice(0, 3));
-  }, []);
-
+  const isClient = useIsClient();
   const [avatarError, setAvatarError] = useState(false);
+  const reports = useMemo<DiagnosisReport[]>(
+    () => (isClient ? getReports().slice(0, 3) : []),
+    [isClient],
+  );
 
   return (
     <div className="h-full overflow-y-auto bg-background">

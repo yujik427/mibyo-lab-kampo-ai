@@ -1,17 +1,26 @@
-import type { DiagnosisQuestion } from "./types";
+import type { DiagnosisOption, DiagnosisQuestion } from "./types";
 
 export const AVATAR_SRC = "/avatars/Kampot-kun.png";
 export const AVATAR_ALT = "Kampot-kun";
 
 export const LS_USER_ID = "kampo_user_id";
 export const LS_CONV_ID_FREE = "kampo_conversation_id_free";
-export const LS_CONV_ID_DIAG = "kampo_conversation_id_diag";
+export const LS_CONV_ID_DIAG = "kampo_conversation_id_diag_v2";
 export const LS_MESSAGES_FREE = "kampo_messages_free_v1";
-export const LS_MESSAGES_DIAG = "kampo_messages_diag_v1";
+export const LS_MESSAGES_DIAG = "kampo_messages_diag_v2";
 export const LS_MODE = "kampo_mode_v1";
-export const LS_DIAG_ANSWERS = "kampo_diag_answers_v1";
-export const LS_DIAG_INDEX = "kampo_diag_index_v1";
+export const LS_DIAG_ANSWERS = "kampo_diag_answers_v2";
+export const LS_DIAG_INDEX = "kampo_diag_index_v2";
 export const LS_REPORTS = "kampo_reports_v1";
+export const DIAGNOSIS_ANSWER_PERIOD_LABEL = "直近2週間";
+
+export const DIAGNOSIS_FREQUENCY_OPTIONS = [
+  { value: "0", label: "0: まったくない" },
+  { value: "1", label: "1: ほとんどない" },
+  { value: "2", label: "2: ときどきある" },
+  { value: "3", label: "3: よくある" },
+  { value: "4", label: "4: ほぼ毎日ある" },
+] as const satisfies readonly DiagnosisOption[];
 
 export const FREE_WELCOME_MESSAGE =
   "こんにちは。ご利用いただきありがとうございます😊🌿\nまず最初に、年齢と性別を教えてください。\n例：35歳・男性 / 30代・女性\n\n（このあと全20問で、体調や体質の傾向を漢方的な視点で整理していきます。正解・不正解はありません。※本チャットは医療行為・診断を目的としたものではありません。体調に強い不安がある場合は医療機関にご相談ください。）";
@@ -19,203 +28,102 @@ export const FREE_WELCOME_MESSAGE =
 export const DIAGNOSIS_QUESTIONS: DiagnosisQuestion[] = [
   {
     id: "q1",
-    question: "普段の体調はどうですか？",
-    options: [
-      { value: "good", label: "元気で調子が良い" },
-      { value: "normal", label: "普通" },
-      { value: "tired", label: "疲れやすい" },
-      { value: "weak", label: "体が弱い" },
-    ],
+    question: "朝起きたとき、寝ても疲れが残っていると感じることがありますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q2",
-    question: "冷え性の症状はありますか？",
-    options: [
-      { value: "severe", label: "かなり冷える" },
-      { value: "moderate", label: "少し冷える" },
-      { value: "mild", label: "たまに冷える" },
-      { value: "none", label: "冷えは感じない" },
-    ],
+    question: "少し動いただけでも、疲れやすい・しんどいと感じることがありますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q3",
-    question: "のぼせやほてりの症状はありますか？",
-    options: [
-      { value: "often", label: "よくある" },
-      { value: "sometimes", label: "たまにある" },
-      { value: "rare", label: "ほとんどない" },
-      { value: "none", label: "全くない" },
-    ],
+    question: "最近、ため息をつくことが増えたと感じますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q4",
-    question: "汗のかき方はどうですか？",
-    options: [
-      { value: "much", label: "よく汗をかく" },
-      { value: "normal", label: "普通" },
-      { value: "little", label: "あまり汗をかかない" },
-      { value: "none", label: "ほとんど汗をかかない" },
-    ],
+    question: "ストレスがかかると、胸やお腹が張る感じが出やすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q5",
-    question: "食欲はどうですか？",
-    options: [
-      { value: "good", label: "食欲旺盛" },
-      { value: "normal", label: "普通" },
-      { value: "poor", label: "食欲がない" },
-      { value: "irregular", label: "食欲が不安定" },
-    ],
+    question: "ゲップが出やすい、または胃がムカムカしやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q6",
-    question: "便通はどうですか？",
-    options: [
-      { value: "regular", label: "毎日規則正しい" },
-      { value: "constipation", label: "便秘気味" },
-      { value: "diarrhea", label: "下痢気味" },
-      { value: "irregular", label: "不規則" },
-    ],
+    question: "緊張すると、喉につかえる感じや胸のつかえ感が出やすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q7",
-    question: "睡眠の質はどうですか？",
-    options: [
-      { value: "good", label: "よく眠れる" },
-      { value: "normal", label: "普通" },
-      { value: "poor", label: "眠りが浅い" },
-      { value: "insomnia", label: "不眠気味" },
-    ],
+    question: "立ち上がったときに、クラッとしたりふらついたりすることがありますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q8",
-    question: "ストレスを感じることは多いですか？",
-    options: [
-      { value: "much", label: "よく感じる" },
-      { value: "sometimes", label: "たまに感じる" },
-      { value: "rare", label: "あまり感じない" },
-      { value: "none", label: "ほとんど感じない" },
-    ],
+    question: "目が疲れやすい、または目がかすみやすいと感じますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q9",
-    question: "肩こりや首こりの症状はありますか？",
-    options: [
-      { value: "severe", label: "ひどい" },
-      { value: "moderate", label: "ある" },
-      { value: "mild", label: "たまにある" },
-      { value: "none", label: "ない" },
-    ],
+    question: "肩・首・腰など、同じ場所のこりや痛みが長引きやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q10",
-    question: "頭痛の症状はありますか？",
-    options: [
-      { value: "often", label: "よくある" },
-      { value: "sometimes", label: "たまにある" },
-      { value: "rare", label: "ほとんどない" },
-      { value: "none", label: "全くない" },
-    ],
+    question: "顔色のくすみ、目の下のクマ、唇の暗さが気になることがありますか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q11",
-    question: "めまいや立ちくらみはありますか？",
-    options: [
-      { value: "often", label: "よくある" },
-      { value: "sometimes", label: "たまにある" },
-      { value: "rare", label: "ほとんどない" },
-      { value: "none", label: "全くない" },
-    ],
+    question: "脚や足首がむくみやすい、下半身が重だるいと感じやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q12",
-    question: "むくみの症状はありますか？",
-    options: [
-      { value: "often", label: "よくある" },
-      { value: "sometimes", label: "たまにある" },
-      { value: "rare", label: "ほとんどない" },
-      { value: "none", label: "全くない" },
-    ],
+    question: "頭が重い、すっきりしない、上半身が重だるいと感じることが多いですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q13",
-    question: "肌の状態はどうですか？",
-    options: [
-      { value: "good", label: "きれい" },
-      { value: "dry", label: "乾燥気味" },
-      { value: "oily", label: "脂っぽい" },
-      { value: "rough", label: "荒れている" },
-    ],
+    question: "口やのどが乾きやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q14",
-    question: "生理の状態はどうですか？（女性の場合）",
-    options: [
-      { value: "regular", label: "規則正しい" },
-      { value: "irregular", label: "不規則" },
-      { value: "painful", label: "痛みがある" },
-      { value: "heavy", label: "量が多い" },
-      { value: "na", label: "該当しない" },
-    ],
+    question: "すね・足首・かかとなど、下半身の皮膚が乾燥しやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q15",
-    question: "口の渇きは感じますか？",
-    options: [
-      { value: "often", label: "よく感じる" },
-      { value: "sometimes", label: "たまに感じる" },
-      { value: "rare", label: "ほとんど感じない" },
-      { value: "none", label: "全く感じない" },
-    ],
+    question: "食後に、強い眠気やだるさが出やすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q16",
-    question: "のどの渇きは感じますか？",
-    options: [
-      { value: "often", label: "よく感じる" },
-      { value: "sometimes", label: "たまに感じる" },
-      { value: "rare", label: "ほとんど感じない" },
-      { value: "none", label: "全く感じない" },
-    ],
+    question: "ストレスがかかると、食欲や胃腸の調子が乱れやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q17",
-    question: "イライラしやすいですか？",
-    options: [
-      { value: "often", label: "よくイライラする" },
-      { value: "sometimes", label: "たまにイライラする" },
-      { value: "rare", label: "あまりイライラしない" },
-      { value: "none", label: "ほとんどイライラしない" },
-    ],
+    question: "雨の日や湿気の多い日に、不調が強くなりやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q18",
-    question: "疲れやすさはどうですか？",
-    options: [
-      { value: "severe", label: "とても疲れやすい" },
-      { value: "moderate", label: "疲れやすい" },
-      { value: "mild", label: "少し疲れやすい" },
-      { value: "none", label: "疲れにくい" },
-    ],
+    question: "便が硬い、またはコロコロした便になりやすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q19",
-    question: "運動はしますか？",
-    options: [
-      { value: "often", label: "よくする" },
-      { value: "sometimes", label: "たまにする" },
-      { value: "rare", label: "ほとんどしない" },
-      { value: "none", label: "全くしない" },
-    ],
+    question: "めまい、頭の重さ、乗り物酔いのような不快感が出やすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
   {
     id: "q20",
-    question: "食事のバランスはどうですか？",
-    options: [
-      { value: "good", label: "バランスが良い" },
-      { value: "normal", label: "普通" },
-      { value: "poor", label: "偏りがある" },
-      { value: "irregular", label: "不規則" },
-    ],
+    question: "夕方から夜にかけて、目やのどの乾き、上半身の乾燥感が出やすいですか。",
+    options: [...DIAGNOSIS_FREQUENCY_OPTIONS],
   },
 ];
