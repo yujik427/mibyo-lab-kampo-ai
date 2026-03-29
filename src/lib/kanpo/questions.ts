@@ -132,7 +132,7 @@ export const KANPO_CHAT_QUESTIONS: readonly Question[] = [
 ] as const;
 
 export const KANPO_CHAT_TOTAL_QUESTIONS = KANPO_CHAT_QUESTIONS.length;
-export const KANPO_CHAT_STORAGE_KEY = "kanpo_ai_direct_session_v1";
+export const KANPO_CHAT_STORAGE_KEY = "kanpo_ai_direct_session_v3";
 export const KANPO_CHAT_REPORT_STORAGE_KEY = "kanpo_ai_direct_reports_v1";
 
 export function getKanpoQuestionById(questionId: string) {

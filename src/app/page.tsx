@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ClipboardCheck, MessageCircle, FileText, ChevronRight, Leaf } from "lucide-react";
+import { Bot, ClipboardCheck, MessageCircle, FileText, ChevronRight, Leaf } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -119,6 +119,13 @@ export default function DashboardPage() {
           <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
             体質チェック
           </h2>
+          <FeatureCard
+            title="AI直結版（β）"
+            description="新しい20問UIと結果表示を確認する検証ルート。Difyを通さず段階移行中の画面です"
+            icon={Bot}
+            href="/kanpo-chat"
+            badge="β"
+          />
           <FeatureCard
             title="体質分析"
             description="今の不調に合わせて質問が変わる対話型。原因の手がかりまで深掘り"

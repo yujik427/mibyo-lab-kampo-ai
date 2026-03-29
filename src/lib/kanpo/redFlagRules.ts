@@ -59,28 +59,20 @@ function collectSourceTexts(answers: AnswerItem[], chiefComplaintSummary: string
     .filter(Boolean);
 }
 
-export function evaluateRedFlags(
-  answers: AnswerItem[],
-  chiefComplaintSummary = "",
-): RedFlagSummary {
-  const sourceTexts = collectSourceTexts(answers, chiefComplaintSummary);
-
-  const textMatches = RED_FLAG_RULES.filter((rule) =>
+function buildTextMatches(sourceTexts: string[]) {
+  return RED_FLAG_RULES.filter((rule) =>
     sourceTexts.some((text) => rule.pattern.test(text)),
   ).map<RedFlagMatch>((rule) => ({
     id: rule.id,
     label: rule.label,
     reason: rule.reason,
   }));
+}
 
-  const parserMatches = answers
-    .filter((answer) => answer.redFlagHint)
-    .map<RedFlagMatch>((answer, index) => ({
-      id: `parser-${answer.questionId}-${index}`,
-      label: "AI整理で赤旗候補",
-      reason: answer.redFlagReason || `${answer.questionId} の自由回答に赤旗候補が含まれました。`,
-    }));
-
+function buildRedFlagSummary(
+  textMatches: RedFlagMatch[],
+  parserMatches: RedFlagMatch[],
+): RedFlagSummary {
   const matchedRules = [...textMatches, ...parserMatches];
 
   return {
@@ -91,4 +83,40 @@ export function evaluateRedFlags(
         ? matchedRules.map((match) => `- ${match.label}: ${match.reason}`).join("\n")
         : "現時点で固定ルールに該当する赤旗症状は検出されていません。",
   };
+}
+
+export function evaluateRedFlagsFromTexts(
+  sourceTexts: string[],
+  parserReasons: string[] = [],
+): RedFlagSummary {
+  const textMatches = buildTextMatches(
+    sourceTexts.map((text) => text.trim()).filter(Boolean),
+  );
+  const parserMatches = parserReasons
+    .map((reason) => reason.trim())
+    .filter(Boolean)
+    .map<RedFlagMatch>((reason, index) => ({
+      id: `parser-text-${index}`,
+      label: "AI整理で赤旗候補",
+      reason,
+    }));
+
+  return buildRedFlagSummary(textMatches, parserMatches);
+}
+
+export function evaluateRedFlags(
+  answers: AnswerItem[],
+  chiefComplaintSummary = "",
+): RedFlagSummary {
+  const sourceTexts = collectSourceTexts(answers, chiefComplaintSummary);
+  const textMatches = buildTextMatches(sourceTexts);
+  const parserMatches = answers
+    .filter((answer) => answer.redFlagHint)
+    .map<RedFlagMatch>((answer, index) => ({
+      id: `parser-${answer.questionId}-${index}`,
+      label: "AI整理で赤旗候補",
+      reason: answer.redFlagReason || `${answer.questionId} の自由回答に赤旗候補が含まれました。`,
+    }));
+
+  return buildRedFlagSummary(textMatches, parserMatches);
 }

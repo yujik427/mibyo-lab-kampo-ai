@@ -7,6 +7,7 @@ import {
   MAIN_SCORE_WEIGHTS,
   type WeightedQuestionId,
 } from "./scoreConfig";
+import { SCORE_SLOT_REGISTRY } from "./slotRegistry";
 import type {
   AnswerItem,
   BodyFigureValues,
@@ -15,10 +16,13 @@ import type {
   QuestionId,
   ScoreDetail,
   ScoreSnapshot,
+  ScoreSlotId,
+  ScoreSlotState,
   SubScores,
 } from "./types";
 
 type AnswerScoreMap = Partial<Record<QuestionId, number>>;
+type ScoreSlotStateLike = Pick<ScoreSlotState, "status" | "value"> | ScoreSlotState;
 
 function clampPercent(score: number) {
   return Math.max(0, Math.min(100, score));
@@ -58,6 +62,10 @@ function getAnswerScore(answerMap: AnswerScoreMap, questionId: QuestionId) {
   return answerMap[questionId] ?? 0;
 }
 
+function getConfirmedAnswerScore(answerMap: AnswerScoreMap, questionId: QuestionId) {
+  return answerMap[questionId] ?? null;
+}
+
 function averageWeighted(answerMap: AnswerScoreMap, weightedQuestionIds: readonly WeightedQuestionId[]) {
   let total = 0;
   let totalWeight = 0;
@@ -65,6 +73,25 @@ function averageWeighted(answerMap: AnswerScoreMap, weightedQuestionIds: readonl
   for (const entry of weightedQuestionIds) {
     const [questionId, weight] = Array.isArray(entry) ? entry : [entry, 1];
     total += getAnswerScore(answerMap, questionId) * weight;
+    totalWeight += weight;
+  }
+
+  return totalWeight > 0 ? total / totalWeight : 0;
+}
+
+function averageConfirmedWeighted(
+  answerMap: AnswerScoreMap,
+  weightedQuestionIds: readonly WeightedQuestionId[],
+) {
+  let total = 0;
+  let totalWeight = 0;
+
+  for (const entry of weightedQuestionIds) {
+    const [questionId, weight] = Array.isArray(entry) ? entry : [entry, 1];
+    const answerScore = getConfirmedAnswerScore(answerMap, questionId);
+    if (answerScore === null) continue;
+
+    total += answerScore * weight;
     totalWeight += weight;
   }
 
@@ -80,6 +107,25 @@ function sumWeighted(answerMap: AnswerScoreMap, weightedQuestionIds: readonly We
   }
 
   return total;
+}
+
+function sumConfirmedWeightedWithMax(
+  answerMap: AnswerScoreMap,
+  weightedQuestionIds: readonly WeightedQuestionId[],
+) {
+  let raw = 0;
+  let max = 0;
+
+  for (const entry of weightedQuestionIds) {
+    const [questionId, weight] = Array.isArray(entry) ? entry : [entry, 1];
+    const answerScore = getConfirmedAnswerScore(answerMap, questionId);
+    if (answerScore === null) continue;
+
+    raw += answerScore * weight;
+    max += 4 * weight;
+  }
+
+  return { raw, max };
 }
 
 function buildScoreDetail(raw: number, max: number, percent: number): ScoreDetail {
@@ -119,6 +165,30 @@ function hasMinimumAnswer(answerMap: AnswerScoreMap, questionId: QuestionId, min
   return getAnswerScore(answerMap, questionId) >= minimumValue;
 }
 
+function hasConfirmedMinimumAnswer(
+  answerMap: AnswerScoreMap,
+  questionId: QuestionId,
+  minimumValue: number,
+) {
+  const answerScore = getConfirmedAnswerScore(answerMap, questionId);
+  return answerScore !== null && answerScore >= minimumValue;
+}
+
+function scoreSlotStatesToConfirmedAnswerMap(
+  scoreSlotStates: Partial<Record<ScoreSlotId, ScoreSlotStateLike>>,
+): AnswerScoreMap {
+  const answerMap: AnswerScoreMap = {};
+
+  for (const slot of SCORE_SLOT_REGISTRY) {
+    const state = scoreSlotStates[slot.id];
+    if (!state || state.status !== "confirmed" || typeof state.value !== "number") continue;
+
+    answerMap[slot.hiddenScoreKey] = Math.max(0, Math.min(4, Math.trunc(state.value)));
+  }
+
+  return answerMap;
+}
+
 export function computeMainScores(answers: AnswerItem[]): MainScores {
   const answerMap = answersToScoreMap(answers);
   const oketsuConfidenceFactor = getOketsuConfidenceFactor(answerMap);
@@ -133,6 +203,40 @@ export function computeMainScores(answers: AnswerItem[]): MainScores {
     }
 
     const maxScore = MAIN_SCORE_MAX_RAW[parameter];
+    const basePercent = normalizePercent(rawScore, maxScore);
+    const finalPercent =
+      parameter === "瘀血" ? clampPercent(basePercent * oketsuConfidenceFactor) : basePercent;
+
+    return [parameter, buildScoreDetail(rawScore, maxScore, finalPercent)];
+  });
+
+  return Object.fromEntries(entries) as MainScores;
+}
+
+export function computeMainScoresFromConfirmedSlots(
+  scoreSlotStates: Partial<Record<ScoreSlotId, ScoreSlotStateLike>>,
+): MainScores {
+  const answerMap = scoreSlotStatesToConfirmedAnswerMap(scoreSlotStates);
+  const q9Score = getConfirmedAnswerScore(answerMap, "Q09");
+  const q10Score = getConfirmedAnswerScore(answerMap, "Q10");
+  const oketsuConfidenceFactor =
+    q9Score !== null && q10Score !== null ? getOketsuConfidenceFactor(answerMap) : 1;
+
+  const entries = MAIN_SCORE_ORDER.map((parameter) => {
+    let rawScore = 0;
+    let maxScore = 0;
+
+    for (const slot of SCORE_SLOT_REGISTRY) {
+      const answerScore = getConfirmedAnswerScore(answerMap, slot.hiddenScoreKey);
+      if (answerScore === null) continue;
+
+      for (const link of slot.mainScoreLinks) {
+        if (link.target !== parameter) continue;
+        rawScore += answerScore * link.weight;
+        maxScore += 4 * link.weight;
+      }
+    }
+
     const basePercent = normalizePercent(rawScore, maxScore);
     const finalPercent =
       parameter === "瘀血" ? clampPercent(basePercent * oketsuConfidenceFactor) : basePercent;
@@ -179,6 +283,43 @@ export function computeSubScores(answers: AnswerItem[]): SubScores {
       lowerDryRaw,
       BODY_SCORE_MAX.lowerDry,
       normalizePercent(lowerDryRaw, BODY_SCORE_MAX.lowerDry),
+    ),
+  };
+}
+
+export function computeSubScoresFromConfirmedSlots(
+  scoreSlotStates: Partial<Record<ScoreSlotId, ScoreSlotStateLike>>,
+): SubScores {
+  const answerMap = scoreSlotStatesToConfirmedAnswerMap(scoreSlotStates);
+  const dry = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.dry);
+  const damp = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.damp);
+  const upperDamp = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.upperDamp);
+  const lowerDamp = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.lowerDamp);
+  const upperDry = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.upperDry);
+  const lowerDry = sumConfirmedWeightedWithMax(answerMap, BODY_SCORE_CONFIG.lowerDry);
+
+  return {
+    dry: buildScoreDetail(dry.raw, dry.max, normalizePercent(dry.raw, dry.max)),
+    damp: buildScoreDetail(damp.raw, damp.max, normalizePercent(damp.raw, damp.max)),
+    upperDamp: buildScoreDetail(
+      upperDamp.raw,
+      upperDamp.max,
+      normalizePercent(upperDamp.raw, upperDamp.max),
+    ),
+    lowerDamp: buildScoreDetail(
+      lowerDamp.raw,
+      lowerDamp.max,
+      normalizePercent(lowerDamp.raw, lowerDamp.max),
+    ),
+    upperDry: buildScoreDetail(
+      upperDry.raw,
+      upperDry.max,
+      normalizePercent(upperDry.raw, upperDry.max),
+    ),
+    lowerDry: buildScoreDetail(
+      lowerDry.raw,
+      lowerDry.max,
+      normalizePercent(lowerDry.raw, lowerDry.max),
     ),
   };
 }
@@ -242,10 +383,81 @@ export function computeBodyFigureValues(answers: AnswerItem[]): BodyFigureValues
   };
 }
 
+export function computeBodyFigureValuesFromConfirmedSlots(
+  scoreSlotStates: Partial<Record<ScoreSlotId, ScoreSlotStateLike>>,
+): BodyFigureValues {
+  const answerMap = scoreSlotStatesToConfirmedAnswerMap(scoreSlotStates);
+  const subScores = computeSubScoresFromConfirmedSlots(scoreSlotStates);
+
+  const deficiencyBurden = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.deficiencySignals);
+  const accumulationBurden = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.accumulationSignals);
+  const upperHeatSignals = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.upperHeatSignals);
+  const upperColdSignals = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.upperColdSignals);
+  const lowerHeatSignals = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.lowerHeatSignals);
+  const lowerColdSignals = averageConfirmedWeighted(answerMap, BODY_SCORE_CONFIG.lowerColdSignals);
+
+  const hasUpperDampTendency =
+    subScores.damp.percent >= BODY_TENDENCY_THRESHOLDS.upperDamp.global &&
+    subScores.upperDamp.percent >= BODY_TENDENCY_THRESHOLDS.upperDamp.local;
+  const hasLowerDampTendency =
+    subScores.damp.percent >= BODY_TENDENCY_THRESHOLDS.lowerDamp.global &&
+    subScores.lowerDamp.percent >= BODY_TENDENCY_THRESHOLDS.lowerDamp.local &&
+    hasConfirmedMinimumAnswer(
+      answerMap,
+      BODY_TENDENCY_THRESHOLDS.lowerDamp.minimumQuestion,
+      BODY_TENDENCY_THRESHOLDS.lowerDamp.minimumValue,
+    );
+  const hasUpperDryTendency =
+    subScores.dry.percent >= BODY_TENDENCY_THRESHOLDS.upperDry.global &&
+    subScores.upperDry.percent >= BODY_TENDENCY_THRESHOLDS.upperDry.local;
+  const hasLowerDryTendency =
+    subScores.dry.percent >= BODY_TENDENCY_THRESHOLDS.lowerDry.global &&
+    subScores.lowerDry.percent >= BODY_TENDENCY_THRESHOLDS.lowerDry.local &&
+    hasConfirmedMinimumAnswer(
+      answerMap,
+      BODY_TENDENCY_THRESHOLDS.lowerDry.minimumQuestion,
+      BODY_TENDENCY_THRESHOLDS.lowerDry.minimumValue,
+    );
+
+  const upperRegionalTextureScore = pickRegionalTextureScore(
+    hasUpperDampTendency ? subScores.upperDamp.percent : 0,
+    hasUpperDryTendency ? subScores.upperDry.percent : 0,
+  );
+  const lowerRegionalTextureScore = pickRegionalTextureScore(
+    hasLowerDampTendency ? subScores.lowerDamp.percent : 0,
+    hasLowerDryTendency ? subScores.lowerDry.percent : 0,
+  );
+
+  const soshitsu = clampSignedScore((subScores.damp.raw - subScores.dry.raw) / 4);
+
+  return {
+    kyojitsu: snapDisplayScore(accumulationBurden - deficiencyBurden),
+    upperTemp: snapDisplayScore((upperHeatSignals - upperColdSignals) * 0.85),
+    lowerTemp: snapDisplayScore(lowerHeatSignals - lowerColdSignals),
+    soshitsu: snapDisplayScore(soshitsu),
+    upperTextureScore: snapDisplayScore(
+      upperRegionalTextureScore !== 0 ? upperRegionalTextureScore : soshitsu,
+    ),
+    lowerTextureScore: snapDisplayScore(
+      lowerRegionalTextureScore !== 0 ? lowerRegionalTextureScore : soshitsu,
+    ),
+  };
+}
+
 export function computeScoreSnapshot(answers: AnswerItem[]): ScoreSnapshot {
   return {
     mainScores: computeMainScores(answers),
     subScores: computeSubScores(answers),
     bodyFigureValues: computeBodyFigureValues(answers),
+  };
+}
+
+export function computeScoreSnapshotFromConfirmedSlots(
+  scoreSlotStates: Partial<Record<ScoreSlotId, ScoreSlotStateLike>>,
+): ScoreSnapshot {
+  return {
+    mainScores: computeMainScoresFromConfirmedSlots(scoreSlotStates),
+    subScores: computeSubScoresFromConfirmedSlots(scoreSlotStates),
+    bodyFigureValues: computeBodyFigureValuesFromConfirmedSlots(scoreSlotStates),
   };
 }

@@ -6,9 +6,11 @@ import type { QuestionProgress } from "@/lib/kanpo/types";
 interface ProgressHeaderProps {
   progress: QuestionProgress;
   onReset: () => void;
+  onUndo: () => void;
+  canUndo: boolean;
 }
 
-export function ProgressHeader({ progress, onReset }: ProgressHeaderProps) {
+export function ProgressHeader({ progress, onReset, onUndo, canUndo }: ProgressHeaderProps) {
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-5 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -21,9 +23,14 @@ export function ProgressHeader({ progress, onReset }: ProgressHeaderProps) {
             進行管理と採点はアプリ側で固定し、AIはフィードバックと最終レポートだけを担当します。
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={onReset}>
-          最初からやり直す
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={onUndo} disabled={!canUndo}>
+            1つ前に戻る
+          </Button>
+          <Button variant="outline" size="sm" onClick={onReset}>
+            最初からやり直す
+          </Button>
+        </div>
       </div>
 
       <div className="space-y-2">

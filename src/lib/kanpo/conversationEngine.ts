@@ -11,6 +11,15 @@ export const DEFAULT_KANPO_SESSION: KanpoSessionState = {
   feedbackHistory: [],
   finalReportText: "",
   updatedAt: "",
+  chiefComplaintInput: "",
+  chiefComplaintSummary: "",
+  chiefComplaintCategoryHints: [],
+  scoreSlotStates: {},
+  lastCategoryId: null,
+  currentTurn: null,
+  safetyCheck: null,
+  freeTextHistory: [],
+  undoStack: [],
 };
 
 export function getKanpoSessionStorageKey() {
